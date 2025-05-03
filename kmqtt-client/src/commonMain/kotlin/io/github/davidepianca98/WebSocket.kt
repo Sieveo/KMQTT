@@ -10,41 +10,40 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-public class WebSocket(host: String, port: Int, path: String = "/mqtt", ready: () -> Unit) : SocketInterface {
+public class WebSocket(
+    private val host: String,
+    private val port: Int,
+    private val path: String = "/mqtt"
+) : SocketInterface {
 
     //TODO: handle exception properly inside of scope
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default).apply {
     }
     private var session: WebSocketSession? = null
 
-    init {
-        val client = HttpClient() {
-            install(WebSockets)
-        }
-        scope.launch {
-            session = client.webSocketSession(method = HttpMethod.Get, host = host, port = port, path = path) {
-                header(HttpHeaders.SecWebSocketProtocol, "mqtt")
-            }
-
-            println("Connected to WebSocket")
-            ready()
-        }
+    private val client = HttpClient() {
+        install(WebSockets)
     }
 
-    override fun send(data: UByteArray) {
-        println("Sending data to WebSocket - outside launch")
-        scope.launch {
-            println("Sending data to WebSocket")
-            session?.send(Frame.Binary(true, data.toByteArray()))
+    public override suspend fun connect() {
+        session = client.webSocketSession(method = HttpMethod.Get, host = host, port = port, path = path) {
+            header(HttpHeaders.SecWebSocketProtocol, "mqtt")
         }
+
+        println("Connected to WebSocket")
+    }
+
+    override suspend fun send(data: UByteArray) {
+        session?.send(Frame.Binary(true, data.toByteArray()))
     }
 
     override fun sendRemaining() {
         //NO-OP, we let send do the work for us
     }
 
-    override fun read(): UByteArray? {
-        val frame = session?.incoming?.tryReceive()?.getOrNull() ?: return null
+    override suspend fun read(): UByteArray? {
+        val frame = session?.incoming?.receive() ?: return null
+        println("Received frame of type ${frame.frameType}")
 
         return when (frame) {
             is Frame.Binary -> return frame.data.asUByteArray()

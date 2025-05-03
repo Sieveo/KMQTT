@@ -21,6 +21,7 @@ kotlin {
             commonWebpackConfig {
                 outputFileName = "$moduleName.js"
                 devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
+                    open = false //Stops browser from opening every time
                     static = (static ?: mutableListOf()).apply {
                         // Serve sources to debug inside browser
                         add(project.projectDir.path)
@@ -41,6 +42,10 @@ kotlin {
             implementation(compose.materialIconsExtended)
             implementation(compose.animation)
             implementation(compose.components.resources)
+
+            implementation(libs.lifecycle.viewmodel)
+            implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.lifecycle.runtime.compose)
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)

@@ -12,13 +12,13 @@ import kotlinx.cinterop.usePinned
 import io.github.davidepianca98.send
 import io.github.davidepianca98.socket.IOException
 import io.github.davidepianca98.socket.SocketClosedException
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 
 public actual open class Socket(
     protected val socket: Int,
     private val writeRequest: MutableList<Int>?,
     private val buffer: ByteArray
-) : SocketInterface {
+) : OldSocketInterface {
 
     private var pendingSendData = mutableListOf<UByteArray>()
 

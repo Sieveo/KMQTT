@@ -16,37 +16,37 @@ kotlin {
             kotlinOptions.jvmTarget = "1.8"
         }
     }
-    js {
-        useCommonJs()
-        nodejs {
-            binaries.executable()
-        }
-    }
-    mingwX64 {
-        binaries {
-            executable()
-        }
-    }
-    linuxX64 {
-        binaries {
-            executable()
-        }
-    }
-    linuxArm64 {
-        binaries {
-            executable()
-        }
-    }
-    macosX64 {
-        binaries {
-            executable()
-        }
-    }
-    macosArm64 {
-        binaries {
-            executable()
-        }
-    }
+//    js {
+//        useCommonJs()
+//        nodejs {
+//            binaries.executable()
+//        }
+//    }
+//    mingwX64 {
+//        binaries {
+//            executable()
+//        }
+//    }
+//    linuxX64 {
+//        binaries {
+//            executable()
+//        }
+//    }
+//    linuxArm64 {
+//        binaries {
+//            executable()
+//        }
+//    }
+//    macosX64 {
+//        binaries {
+//            executable()
+//        }
+//    }
+//    macosArm64 {
+//        binaries {
+//            executable()
+//        }
+//    }
 
     sourceSets {
         all {
@@ -86,37 +86,37 @@ kotlin {
                 implementation(kotlin("test-junit"))
             }
         }
-        val jsMain by getting {
-            dependencies {
-                implementation(libs.kotlin.node)
-            }
-        }
-        val jsTest by getting {
-            dependencies {
-                implementation(kotlin("test-js"))
-            }
-        }
-        val posixMain by creating {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(libs.atomicfu)
-            }
-        }
-        val mingwX64Main by getting {
-            dependsOn(posixMain)
-        }
-        val linuxX64Main by getting {
-            dependsOn(posixMain)
-        }
-        val linuxArm64Main by getting {
-            dependsOn(posixMain)
-        }
-        val macosX64Main by getting {
-            dependsOn(posixMain)
-        }
-        val macosArm64Main by getting {
-            dependsOn(posixMain)
-        }
+//        val jsMain by getting {
+//            dependencies {
+//                implementation(libs.kotlin.node)
+//            }
+//        }
+//        val jsTest by getting {
+//            dependencies {
+//                implementation(kotlin("test-js"))
+//            }
+//        }
+//        val posixMain by creating {
+//            dependsOn(commonMain)
+//            dependencies {
+//                implementation(libs.atomicfu)
+//            }
+//        }
+//        val mingwX64Main by getting {
+//            dependsOn(posixMain)
+//        }
+//        val linuxX64Main by getting {
+//            dependsOn(posixMain)
+//        }
+//        val linuxArm64Main by getting {
+//            dependsOn(posixMain)
+//        }
+//        val macosX64Main by getting {
+//            dependsOn(posixMain)
+//        }
+//        val macosArm64Main by getting {
+//            dependsOn(posixMain)
+//        }
     }
 }
 

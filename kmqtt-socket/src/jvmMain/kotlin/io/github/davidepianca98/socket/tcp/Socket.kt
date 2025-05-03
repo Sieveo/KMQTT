@@ -2,7 +2,7 @@ package io.github.davidepianca98.socket.tcp
 
 import io.github.davidepianca98.socket.IOException
 import io.github.davidepianca98.socket.SocketClosedException
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 import io.github.davidepianca98.toUByteArray
 import java.nio.BufferOverflowException
 import java.nio.ByteBuffer
@@ -16,7 +16,7 @@ public actual open class Socket(
     private val key: SelectionKey?,
     private var sendBuffer: ByteBuffer,
     private val receiveBuffer: ByteBuffer
-) : SocketInterface {
+) : OldSocketInterface {
 
     private val lock = ReentrantLock()
 

@@ -1,8 +1,9 @@
 package io.github.davidepianca98.socket.tcp
 
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 
-public expect open class Socket : SocketInterface {
+
+public expect open class Socket : OldSocketInterface {
 
     override fun send(data: UByteArray)
 

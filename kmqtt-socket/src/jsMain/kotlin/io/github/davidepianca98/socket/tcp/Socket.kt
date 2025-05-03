@@ -3,14 +3,14 @@ package io.github.davidepianca98.socket.tcp
 import node.buffer.Buffer
 import node.net.Socket
 import node.net.SocketEvent
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 import io.github.davidepianca98.socket.SocketState
 import io.github.davidepianca98.toBuffer
 
 public actual open class Socket(
     protected val socket: Socket,
     private val selectCallback: (attachment: Any?, state: SocketState) -> Boolean
-) : SocketInterface {
+) : OldSocketInterface {
 
     private val queue = ArrayDeque<UByteArray>()
     private var attachment: Any? = null

@@ -55,12 +55,12 @@ import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Unsuback
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Unsubscribe
 import io.github.davidepianca98.mqtt.packets.mqttv5.ReasonCode
 import io.github.davidepianca98.socket.IOException
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 import io.github.davidepianca98.socket.streams.EOFException
 import io.github.davidepianca98.socket.tcp.TCPEventHandler
 
 public class ClientConnection(
-    private val client: SocketInterface,
+    private val client: OldSocketInterface,
     private val broker: Broker
 ) : TCPEventHandler {
 

@@ -1,20 +1,5 @@
 package io.github.davidepianca98
 
-import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPubrel
-import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Pubrec
-import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Pubrel
-import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Unsubscribe
-import io.github.davidepianca98.mqtt.packets.mqttv4.SubackReturnCode
-import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Puback
-import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Subscribe
-import kotlinx.atomicfu.AtomicBoolean
-import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.locks.ReentrantLock
-import kotlinx.atomicfu.locks.withLock
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import io.github.davidepianca98.mqtt.MQTTCurrentPacket
 import io.github.davidepianca98.mqtt.MQTTException
 import io.github.davidepianca98.mqtt.MQTTVersion
@@ -29,6 +14,7 @@ import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPuback
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPubcomp
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPublish
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPubrec
+import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPubrel
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTSuback
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTUnsuback
 import io.github.davidepianca98.mqtt.packets.mqttv4.ConnectReturnCode
@@ -39,8 +25,12 @@ import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Pingreq
 import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Puback
 import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Pubcomp
 import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Publish
+import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Pubrec
+import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Pubrel
 import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Suback
 import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Subscribe
+import io.github.davidepianca98.mqtt.packets.mqttv4.MQTT4Unsubscribe
+import io.github.davidepianca98.mqtt.packets.mqttv4.SubackReturnCode
 import io.github.davidepianca98.mqtt.packets.mqttv4.toReasonCode
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Auth
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Connack
@@ -48,11 +38,13 @@ import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Connect
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Disconnect
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Pingreq
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Properties
+import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Puback
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Pubcomp
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Publish
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Pubrec
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Pubrel
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Suback
+import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Subscribe
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Unsuback
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Unsubscribe
 import io.github.davidepianca98.mqtt.packets.mqttv5.ReasonCode
@@ -61,9 +53,16 @@ import io.github.davidepianca98.socket.SocketClosedException
 import io.github.davidepianca98.socket.SocketInterface
 import io.github.davidepianca98.socket.streams.EOFException
 import io.github.davidepianca98.socket.tls.TLSClientSettings
-import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.atomicfu.AtomicBoolean
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.ReentrantLock
+import kotlinx.atomicfu.locks.withLock
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * MQTT 3.1.1 and 5 client
@@ -172,13 +171,9 @@ public class MQTTClient(
         if (userName == null && password != null) {
             throw IllegalArgumentException("Cannot set password without username")
         }
-
-        if (autoInit) {
-            init()
-        }
     }
 
-    public fun init() {
+    public suspend fun init() {
         if (!initialized.value) {
             connectSocket(250, connectTimeout * 1000)
 
@@ -187,12 +182,13 @@ public class MQTTClient(
         }
     }
 
-    private fun connectSocket(readTimeout: Int, connectTimeout: Int) {
+    private suspend fun connectSocket(readTimeout: Int, connectTimeout: Int) {
         connackReceived.getAndSet(false)
-        socket = WebSocket(host = address, port= port){
-            sendConnect()
-        }
+        socket = WebSocket(host = address, port = port)
+        socket?.connect()
+        sendConnect()
 
+//        TODO: add other transports back
 //        if (socket == null) {
 //            connackReceived.getAndSet(false)
 //            socket = if (tls == null)
@@ -213,7 +209,7 @@ public class MQTTClient(
 
     public fun isConnackReceived(): Boolean = connackReceived.value
 
-    private fun send(data: UByteArray, force: Boolean = false) {
+    private suspend fun send(data: UByteArray, force: Boolean = false) {
         if (connackReceived.value || force) {
             socket?.send(data) ?: throw SocketClosedException("MQTT send failed")
             if (debugLog) {
@@ -225,37 +221,18 @@ public class MQTTClient(
         }
     }
 
-    private fun sendConnect() {
+    private suspend fun sendConnect() {
         val connect = if (mqttVersion == MQTTVersion.MQTT3_1_1) {
             MQTT4Connect(
-                "MQTT",
-                ConnectFlags(
-                    userName != null,
-                    password != null,
-                    willRetain,
-                    willQos,
-                    willTopic != null,
-                    cleanStart,
-                    false
-                ),
-                keepAlive.value,
-                clientId ?: generateRandomClientId(),
-                willTopic,
-                willPayload,
-                userName,
-                password
+                "MQTT", ConnectFlags(
+                    userName != null, password != null, willRetain, willQos, willTopic != null, cleanStart, false
+                ), keepAlive.value, clientId ?: generateRandomClientId(), willTopic, willPayload, userName, password
             )
         } else {
             MQTT5Connect(
                 "MQTT",
                 ConnectFlags(
-                    userName != null,
-                    password != null,
-                    willRetain,
-                    willQos,
-                    willTopic != null,
-                    cleanStart,
-                    false
+                    userName != null, password != null, willRetain, willQos, willTopic != null, cleanStart, false
                 ),
                 keepAlive.value,
                 clientId ?: generateRandomClientId(),
@@ -274,8 +251,7 @@ public class MQTTClient(
         lock.withLock {
             do {
                 packetIdentifier++
-                if (packetIdentifier > 65535u)
-                    packetIdentifier = 1u
+                if (packetIdentifier > 65535u) packetIdentifier = 1u
             } while (isPacketIdInUse(packetIdentifier))
 
             return packetIdentifier
@@ -284,12 +260,9 @@ public class MQTTClient(
 
     private fun isPacketIdInUse(packetId: UInt): Boolean {
         lock.withLock {
-            if (qos2ListReceived.contains(packetId))
-                return true
-            if (pendingAcknowledgeMessages[packetId] != null)
-                return true
-            if (pendingAcknowledgePubrel[packetId] != null)
-                return true
+            if (qos2ListReceived.contains(packetId)) return true
+            if (pendingAcknowledgeMessages[packetId] != null) return true
+            if (pendingAcknowledgePubrel[packetId] != null) return true
         }
         return false
     }
@@ -303,7 +276,9 @@ public class MQTTClient(
      * @param payload the content of the message
      * @param properties the properties to be included in the message (used only in MQTT5)
      */
-    public fun publish(retain: Boolean, qos: Qos, topic: String, payload: UByteArray?, properties: MQTT5Properties = MQTT5Properties()) {
+    public suspend fun publish(
+        retain: Boolean, qos: Qos, topic: String, payload: UByteArray?, properties: MQTT5Properties = MQTT5Properties()
+    ) {
         if (!connackReceived.value && properties.authenticationData != null) {
             throw Exception("Not sending until connection complete")
         }
@@ -347,7 +322,9 @@ public class MQTTClient(
      * @param properties the properties to be included in the message (used only in MQTT5)
      * @return the packet Id
      */
-    public fun subscribe(subscriptions: List<Subscription>, properties: MQTT5Properties = MQTT5Properties()): UInt {
+    public suspend fun subscribe(
+        subscriptions: List<Subscription>, properties: MQTT5Properties = MQTT5Properties()
+    ): UInt {
         if (!connackReceived.value && properties.authenticationData != null) {
             throw Exception("Not sending until connection complete")
         }
@@ -368,7 +345,7 @@ public class MQTTClient(
      * @param properties the properties to be included in the message (used only in MQTT5)
      * @return the packet Id
      */
-    public fun unsubscribe(topics: List<String>, properties: MQTT5Properties = MQTT5Properties()): UInt {
+    public suspend fun unsubscribe(topics: List<String>, properties: MQTT5Properties = MQTT5Properties()): UInt {
         if (!connackReceived.value && properties.authenticationData != null) {
             throw Exception("Not sending until connection complete")
         }
@@ -387,7 +364,7 @@ public class MQTTClient(
      *
      * @param reasonCode the specific reason code (only used in MQTT5)
      */
-    public fun disconnect(reasonCode: ReasonCode) {
+    public suspend fun disconnect(reasonCode: ReasonCode) {
         val disconnect = if (mqttVersion == MQTTVersion.MQTT3_1_1) {
             MQTT4Disconnect()
         } else {
@@ -399,8 +376,21 @@ public class MQTTClient(
 
     private var lastException: Exception? = null
 
-    private fun check() {
+    /**
+     * Periodically checks the state of the MQTT client and processes incoming data and messages to ensure proper operation
+     * of the client. Handles tasks such as sending pending messages, reading data, processing received packets, managing
+     * connection keep-alive, and handling disconnections in case of errors or timeouts.
+     *
+     * @param readTimeout the timeout duration for reading data from the socket - defaults to one-third of the
+     * keep-alive interval, expressed in seconds.
+     *
+     * IMPORTANT to note that if data shows up earlier in the socket, then this returns immediately, so this is just
+     * the max time so the loop can execute periodically so the keep alive can be handled.
+     *
+     */
+    private suspend fun check(readTimeout: Duration = 5.seconds) {
         if (!running.value) {
+            println("Client not running")
             return
         }
         if (socket == null) {
@@ -417,7 +407,7 @@ public class MQTTClient(
         }
 
         val data = try {
-            socket?.read()
+            withTimeoutOrNull(readTimeout) { socket?.read() }
         } catch (e: Exception) {
             close()
             onDisconnected(null)
@@ -455,6 +445,12 @@ public class MQTTClient(
             }
         }
 
+        connackCheck()
+        sendKeepAliveIfNeeded()
+    }
+
+
+    private fun connackCheck() {
         // If connack not received in a reasonable amount of time, then disconnect
         val currentTime = currentTimeMillis()
         val lastActive = lastActiveTimestamp.value
@@ -465,6 +461,12 @@ public class MQTTClient(
             lastException = Exception("CONNACK not received in 30 seconds")
             throw lastException!!
         }
+    }
+
+    private suspend fun sendKeepAliveIfNeeded() {
+        val currentTime = currentTimeMillis()
+        val lastActive = lastActiveTimestamp.value
+        val isConnackReceived = connackReceived.value
 
         val actualKeepAlive = keepAlive.value
         if (actualKeepAlive != 0 && isConnackReceived) {
@@ -474,6 +476,7 @@ public class MQTTClient(
                 lastException = MQTTException(ReasonCode.KEEP_ALIVE_TIMEOUT)
                 throw lastException!!
             } else if (currentTime > lastActive + (actualKeepAlive * 1000 * 0.9)) {
+                println("Sending KEEP ALIVE")
                 val pingreq = if (mqttVersion == MQTTVersion.MQTT3_1_1) {
                     MQTT4Pingreq()
                 } else {
@@ -489,36 +492,44 @@ public class MQTTClient(
      * Run a single iteration of the client (blocking)
      * This function blocks the thread for a single iteration duration
      */
-    public fun step() {
+    public suspend fun step() {
         if (running.value) {
             check()
         }
     }
 
+//TODO: update to make clear that is is a suspend funtion, perhaps it should return a job and use an exception handler like initAndRunSuspend?
     /**
      * Run the client (blocking)
      * This function blocks the thread until the client stops
      */
-    public fun run() {
+    public fun run(scope: CoroutineScope): Job = scope.launch {
+        if (autoInit) {
+            init()
+        }
+
         while (running.value) {
             step()
         }
     }
 
-    /**
-     * Run the client
-     * This function runs the thread on the specified dispatcher until the client stops
-     * @param dispatcher the dispatcher on which to run the client
-     * @param exceptionHandler the exception handler for the coroutine scope
-     */
-    public fun runSuspend(
-        dispatcher: CoroutineDispatcher = Dispatchers.Default,
-        exceptionHandler: CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->}
-    ) {
-        CoroutineScope(dispatcher).launch(exceptionHandler) {
-            run()
-        }
-    }
+
+// TODO: Remove, the normal run should be suspendable, otherwise the things like JS won't work given they only have
+// single thread
+//    /**
+//     * Run the client
+//     * This function runs the thread on the specified dispatcher until the client stops
+//     * @param dispatcher the dispatcher on which to run the client
+//     * @param exceptionHandler the exception handler for the coroutine scope
+//     */
+//    public fun runSuspend(
+//        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+//        exceptionHandler: CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->}
+//    ) {
+//        CoroutineScope(dispatcher).launch(exceptionHandler) {
+//            run()
+//        }
+//    }
 
     /**
      * Init and run the client with the ability to cancel
@@ -526,27 +537,27 @@ public class MQTTClient(
      * @param dispatcher the dispatcher on which to run the client
      * @param exceptionHandler the exception handler for the coroutine scope
      */
-    public fun initAndRunSuspend(
-        dispatcher: CoroutineDispatcher = Dispatchers.Default,
-        exceptionHandler: CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->}
-    ): Job {
-        return CoroutineScope(dispatcher).launch(exceptionHandler) {
-            try {
-                init()
-                yield()
-                while (running.value) {
-                    step()
-                    yield()
-                }
-            } finally {
-                if (running.value) {
-                    disconnect(ReasonCode.IMPLEMENTATION_SPECIFIC_ERROR)
-                }
-            }
-        }
-    }
+//    public fun initAndRunSuspend(
+//        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+//        exceptionHandler: CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->}
+//    ): Job {
+//        return CoroutineScope(dispatcher).launch(exceptionHandler) {
+//            try {
+//                init()
+//                yield()
+//                while (running.value) {
+//                    step()
+//                    yield()
+//                }
+//            } finally {
+//                if (running.value) {
+//                    disconnect(ReasonCode.IMPLEMENTATION_SPECIFIC_ERROR)
+//                }
+//            }
+//        }
+//    }
 
-    private fun handlePacket(packet: MQTTPacket) {
+    private suspend fun handlePacket(packet: MQTTPacket) {
         when (packet) {
             is MQTTConnack -> handleConnack(packet)
             is MQTTPublish -> handlePublish(packet)
@@ -563,7 +574,7 @@ public class MQTTClient(
         }
     }
 
-    private fun handleConnack(packet: MQTTConnack) {
+    private suspend fun handleConnack(packet: MQTTConnack) {
         if (packet is MQTT5Connack) {
             if (packet.connectReasonCode != ReasonCode.SUCCESS) {
                 if ((packet.connectReasonCode == ReasonCode.USE_ANOTHER_SERVER || packet.connectReasonCode == ReasonCode.SERVER_MOVED) && packet.properties.serverReference != null) {
@@ -577,8 +588,11 @@ public class MQTTClient(
             this.receiveMax.getAndSet(receiveMax)
             val maximumQos = packet.properties.maximumQos?.let { Qos.valueOf(it.toInt()) } ?: Qos.EXACTLY_ONCE
             this.maximumQos.getAndSet(maximumQos)
+
+            //TODO: Something wrong here to do with atomicfu but just on JVM
             val retainAvailable = packet.properties.retainAvailable != 0u
-            this.retainedSupported.getAndSet(retainAvailable)
+//            this.retainedSupported.getAndSet(retainAvailable)
+
             val maximumServerPacketSize = packet.properties.maximumPacketSize?.toInt() ?: maximumServerPacketSize.value
             this.maximumServerPacketSize.getAndSet(maximumServerPacketSize)
             clientId = packet.properties.assignedClientIdentifier ?: clientId
@@ -620,10 +634,11 @@ public class MQTTClient(
                 }
             }
         }
+
         onConnected(packet)
     }
 
-    private fun handlePublish(packet: MQTTPublish) {
+    private suspend fun handlePublish(packet: MQTTPublish) {
         var correctPacket = packet
 
         if (correctPacket.qos > maximumQos.value) {
@@ -650,7 +665,8 @@ public class MQTTClient(
                 } else if (correctPacket.topicName.isEmpty()) {
                     // Use alias
                     val topicName = topicAliasesClient[correctPacket.properties.topicAlias!!] ?: throw MQTTException(
-                        ReasonCode.PROTOCOL_ERROR)
+                        ReasonCode.PROTOCOL_ERROR
+                    )
                     correctPacket = correctPacket.setTopicFromAlias(topicName)
                 }
             }
@@ -660,6 +676,7 @@ public class MQTTClient(
             Qos.AT_MOST_ONCE -> {
                 publishReceived(correctPacket)
             }
+
             Qos.AT_LEAST_ONCE -> {
                 val puback = if (correctPacket is MQTT4Publish) {
                     MQTT4Puback(correctPacket.packetId!!)
@@ -669,6 +686,7 @@ public class MQTTClient(
                 send(puback.toByteArray())
                 publishReceived(correctPacket)
             }
+
             Qos.EXACTLY_ONCE -> {
                 val pubrec = if (correctPacket is MQTT4Publish) {
                     MQTT4Pubrec(correctPacket.packetId!!)
@@ -693,7 +711,7 @@ public class MQTTClient(
         }
     }
 
-    private fun handlePubrec(packet: MQTTPubrec) {
+    private suspend fun handlePubrec(packet: MQTTPubrec) {
         if (packet is MQTT5Pubrec && properties.requestProblemInformation == 0u && (packet.properties.reasonString != null || packet.properties.userProperty.isNotEmpty())) {
             throw MQTTException(ReasonCode.PROTOCOL_ERROR)
         }
@@ -709,7 +727,7 @@ public class MQTTClient(
         }
     }
 
-    private fun handlePubrel(packet: MQTTPubrel) {
+    private suspend fun handlePubrel(packet: MQTTPubrel) {
         if (packet is MQTT5Pubrel && properties.requestProblemInformation == 0u && (packet.properties.reasonString != null || packet.properties.userProperty.isNotEmpty())) {
             throw MQTTException(ReasonCode.PROTOCOL_ERROR)
         }
@@ -766,14 +784,12 @@ public class MQTTClient(
         lastActiveTimestamp.getAndSet(currentTimeMillis())
     }
 
-    private fun handleAuth(packet: MQTT5Auth) {
+    private suspend fun handleAuth(packet: MQTT5Auth) {
         if (packet.authenticateReasonCode == ReasonCode.CONTINUE_AUTHENTICATION) {
             val data = enhancedAuthCallback(packet.properties.authenticationData)
             val auth = MQTT5Auth(
-                ReasonCode.CONTINUE_AUTHENTICATION,
-                MQTT5Properties(
-                    authenticationMethod = packet.properties.authenticationMethod,
-                    authenticationData = data
+                ReasonCode.CONTINUE_AUTHENTICATION, MQTT5Properties(
+                    authenticationMethod = packet.properties.authenticationMethod, authenticationData = data
                 )
             )
             send(auth.toByteArray(), true)
@@ -785,7 +801,7 @@ public class MQTTClient(
      *
      * @param data the authenticationData if necessary
      */
-    public fun reAuthenticate(data: UByteArray?) {
+    public suspend fun reAuthenticate(data: UByteArray?) {
         val auth = MQTT5Auth(
             ReasonCode.RE_AUTHENTICATE,
             MQTT5Properties(authenticationMethod = properties.authenticationMethod, authenticationData = data)

@@ -1,6 +1,6 @@
 package io.github.davidepianca98.socket
 
-public interface SocketInterface {
+public interface OldSocketInterface {
 
     public fun send(data: UByteArray)
 

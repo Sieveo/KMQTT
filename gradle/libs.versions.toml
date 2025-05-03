@@ -9,8 +9,9 @@ shadow = "8.3.5"
 ktor = "3.1.2"
 
 #Only used for cmp-sample
-compose = "1.7.3"
-compose-hot-reload = "1.0.0-alpha08"
+compose = "1.8.0-rc01"
+lifecycle = "2.9.0-alpha07"
+compose-hot-reload = "1.0.0-alpha09" #Only used in development mode for Compose Mutliplatform App to Hot Reload
 logback= "1.5.18"
 
 [libraries]
@@ -30,6 +31,10 @@ ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.re
 #Only used for cmp-sample
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
