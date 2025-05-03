@@ -4,33 +4,58 @@ import io.github.davidepianca98.MQTTClient
 import io.github.davidepianca98.mqtt.Subscription
 import io.github.davidepianca98.mqtt.packets.Qos
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPublish
-import io.github.davidepianca98.socket.SocketProtocolType
+import io.github.davidepianca98.mqtt.packets.mqttv5.ReasonCode
+import io.github.davidepianca98.socket.ConnectionDetails
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
-data class ConnectionDetails(
-    val address: String,
-    val port: Int,
-    val protocol: SocketProtocolType
-) {
-    companion object {
-        val localhostWS = ConnectionDetails("127.0.0.1", 1884, SocketProtocolType.WEB_SOCKET)
-    }
+sealed interface IncomingOutgoing {
+    val message: String
+    val topic: String
+    val qos: String
+
+    @OptIn(ExperimentalTime::class)
+    val timestamp: Instant
+}
+
+class Incoming(mqttPublish: MQTTPublish) : IncomingOutgoing {
+    @OptIn(ExperimentalUnsignedTypes::class)
+    override val message: String = mqttPublish.payload?.toByteArray()?.decodeToString() ?: ""
+    override val topic: String = mqttPublish.topicName
+    override val qos: String = mqttPublish.qos.toString()
+
+    @OptIn(ExperimentalTime::class)
+    override val timestamp: Instant = Instant.fromEpochMilliseconds(mqttPublish.timestamp)
+}
+
+class Outgoing(override val message: String, override val topic: String, override val qos: String) : IncomingOutgoing {
+    @OptIn(ExperimentalTime::class)
+    override val timestamp: Instant = Clock.System.now()
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
 class AppViewModel : ViewModel() {
     data class UiState(
         val connectionDetails: ConnectionDetails = ConnectionDetails.localhostWS,
+        val isConnected: Boolean = false,
         val message: String = "",
         val sendOnTopic: String = "",
         val subscribeToTopic: String = "",
-        val receivedMessages: List<MQTTPublish> = emptyList(),
+        val incomingAndOutgoingMessages: List<IncomingOutgoing> = emptyList(),
         val subscriptions: List<Subscription> = emptyList()
     )
 
     val uiState = MutableStateFlow(UiState())
+    var client: MQTTClient = MQTTClient(
+        connectionDetails = uiState.value.connectionDetails, publishReceived = {
+            uiState.value = uiState.value.copy(
+                incomingAndOutgoingMessages = uiState.value.incomingAndOutgoingMessages + Incoming(it)
+            )
+        })
 
     fun onAction(action: UiAction) = viewModelScope.launch {
         when (action) {
@@ -46,7 +71,29 @@ class AppViewModel : ViewModel() {
             is UiAction.UpdateConnectionDetails -> uiState.value =
                 uiState.value.copy(connectionDetails = action.connectionDetails)
 
+            is UiAction.Connect -> connect()
+            is UiAction.Disconnect -> disconnect()
         }
+    }
+
+    private fun connect() {
+        client = MQTTClient(
+            connectionDetails = uiState.value.connectionDetails,
+            publishReceived = {
+                uiState.value = uiState.value.copy(
+                    incomingAndOutgoingMessages = uiState.value.incomingAndOutgoingMessages + Incoming(it)
+                )
+            },
+            onConnected = { uiState.value = uiState.value.copy(isConnected = true) },
+            onDisconnected = { uiState.value = uiState.value.copy(isConnected = false) })
+
+        viewModelScope.launch {
+            client.run(this)
+        }
+    }
+
+    private suspend fun disconnect() {
+        client.disconnect(ReasonCode.SUCCESS)
     }
 
     private suspend fun subscribe(topic: String) {
@@ -67,16 +114,13 @@ class AppViewModel : ViewModel() {
             topic = uiState.value.sendOnTopic,
             payload = uiState.value.message.toByteArray().toUByteArray()
         )
-    }
-
-    val client: MQTTClient = MQTTClient(address = "127.0.0.1", port = 1884, publishReceived = {
-        uiState.value = uiState.value.copy(receivedMessages = uiState.value.receivedMessages + it)
-    })
-
-    init {
-        viewModelScope.launch {
-            client.run(this)
-        }
+        uiState.value = uiState.value.copy(
+            incomingAndOutgoingMessages = uiState.value.incomingAndOutgoingMessages + Outgoing(
+                uiState.value.message,
+                uiState.value.sendOnTopic,
+                Qos.EXACTLY_ONCE.toString()
+            )
+        )
     }
 }
 
@@ -88,4 +132,6 @@ sealed class UiAction {
     data class UpdateTopic(val topic: String) : UiAction()
     data class UpdateSubscribedTopic(val subscribedTopic: String) : UiAction()
     data class UpdateConnectionDetails(val connectionDetails: ConnectionDetails) : UiAction()
+    data object Connect : UiAction()
+    data object Disconnect : UiAction()
 }

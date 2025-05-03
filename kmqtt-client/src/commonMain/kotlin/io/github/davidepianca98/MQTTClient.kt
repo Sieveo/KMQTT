@@ -48,6 +48,7 @@ import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Subscribe
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Unsuback
 import io.github.davidepianca98.mqtt.packets.mqttv5.MQTT5Unsubscribe
 import io.github.davidepianca98.mqtt.packets.mqttv5.ReasonCode
+import io.github.davidepianca98.socket.ConnectionDetails
 import io.github.davidepianca98.socket.IOException
 import io.github.davidepianca98.socket.SocketClosedException
 import io.github.davidepianca98.socket.SocketInterface
@@ -69,11 +70,9 @@ import kotlin.time.Duration.Companion.seconds
  *
  * @param autoInit if true then the Connection will be automatically initialized after creation, otherwise you should call MQTTClient init manually, default value is true
  * @param mqttVersion sets the version of MQTT for this client MQTTVersion.MQTT3_1_1 or MQTTVersion.MQTT5
- * @param address the URL of the server without ws/wss/mqtt/mqtts
- * @param port the port of the server
+ * @param connectionDetails connection details object containing the protocol, address, port, and path to connect to
  * @param tls TLS settings, null if no TLS, otherwise it must be set
  * @param keepAlive the MQTT keep alive of the connection in seconds
- * @param webSocket whether to use a WebSocket for the underlying connection, null if no WebSocket, otherwise the HTTP path, usually /mqtt
  * @param cleanStart if set, the Client and Server MUST discard any existing session and start a new session
  * @param clientId identifies the client to the server, but be unique on the server. If set to null then it will be auto generated
  * @param userName the username field of the CONNECT packet
@@ -96,11 +95,9 @@ import kotlin.time.Duration.Companion.seconds
  */
 public class MQTTClient(
     private val mqttVersion: MQTTVersion = MQTTVersion.MQTT5,
-    private val address: String,
-    private val port: Int,
+    private val connectionDetails: ConnectionDetails,
     private val tls: TLSClientSettings? = null,
     keepAlive: Int = 60,
-    private val webSocket: String? = null,
     private val cleanStart: Boolean = true,
     private var clientId: String? = null,
     private val userName: String? = null,
@@ -136,9 +133,11 @@ public class MQTTClient(
 
     // Session
     private var packetIdentifier: UInt = 1u
+
     // QoS 1 and QoS 2 messages which have been sent to the Server, but have not been completely acknowledged
     private val pendingAcknowledgeMessages = mutableMapOf<UInt, MQTTPublish>()
     private val pendingAcknowledgePubrel = mutableMapOf<UInt, MQTTPubrel>()
+
     // QoS 2 messages which have been received from the Server, but have not been completely acknowledged
     private val qos2ListReceived = mutableListOf<UInt>()
 
@@ -184,7 +183,7 @@ public class MQTTClient(
 
     private suspend fun connectSocket(readTimeout: Int, connectTimeout: Int) {
         connackReceived.getAndSet(false)
-        socket = WebSocket(host = address, port = port)
+        socket = WebSocket(connectionDetails)
         socket?.connect()
         sendConnect()
 

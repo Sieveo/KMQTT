@@ -1,5 +1,6 @@
 package io.github.davidepianca98
 
+import io.github.davidepianca98.socket.ConnectionDetails
 import io.github.davidepianca98.socket.SocketInterface
 import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
@@ -10,11 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-public class WebSocket(
-    private val host: String,
-    private val port: Int,
-    private val path: String = "/mqtt"
-) : SocketInterface {
+public class WebSocket(private val connectionDetails: ConnectionDetails) : SocketInterface {
 
     //TODO: handle exception properly inside of scope
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default).apply {
@@ -26,7 +23,7 @@ public class WebSocket(
     }
 
     public override suspend fun connect() {
-        session = client.webSocketSession(method = HttpMethod.Get, host = host, port = port, path = path) {
+        session = client.webSocketSession(connectionDetails.toUrl()) {
             header(HttpHeaders.SecWebSocketProtocol, "mqtt")
         }
 
