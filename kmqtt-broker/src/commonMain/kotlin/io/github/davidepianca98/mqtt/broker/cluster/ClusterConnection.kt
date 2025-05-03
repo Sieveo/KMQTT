@@ -12,10 +12,10 @@ import io.github.davidepianca98.mqtt.broker.cluster.packets.SessionUpdatePacket
 import io.github.davidepianca98.mqtt.broker.cluster.packets.SetRetainedPacket
 import io.github.davidepianca98.mqtt.Subscription
 import io.github.davidepianca98.mqtt.packets.mqtt.MQTTPublish
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 import io.github.davidepianca98.socket.tcp.TCPEventHandler
 
-internal class ClusterConnection(private val socket: SocketInterface, private val broker: Broker) : TCPEventHandler {
+internal class ClusterConnection(private val socket: OldSocketInterface, private val broker: Broker) : TCPEventHandler {
 
     private val currentReceivedPacket = ClusterCurrentPacket()
 

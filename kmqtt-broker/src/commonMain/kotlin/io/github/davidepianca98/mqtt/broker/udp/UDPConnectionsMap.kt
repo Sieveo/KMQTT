@@ -2,11 +2,11 @@ package io.github.davidepianca98.mqtt.broker.udp
 
 import io.github.davidepianca98.mqtt.broker.Broker
 import io.github.davidepianca98.mqtt.broker.ClientConnection
-import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.OldSocketInterface
 import io.github.davidepianca98.socket.udp.UDPEventHandler
 import io.github.davidepianca98.socket.udp.UDPSocket
 
-internal class UDPConnectionsMap(private val socket: UDPSocket, private val broker: Broker) : UDPEventHandler, SocketInterface {
+internal class UDPConnectionsMap(private val socket: UDPSocket, private val broker: Broker) : UDPEventHandler, OldSocketInterface {
 
     private val udpSessions = mutableMapOf<String, ClientConnection>()
     private var currentKey = ""

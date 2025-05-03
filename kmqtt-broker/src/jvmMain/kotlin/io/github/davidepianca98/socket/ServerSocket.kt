@@ -82,7 +82,7 @@ internal actual open class ServerSocket actual constructor(
         return Socket(channel, socketKey, sendBuffer, receiveBuffer)
     }
 
-    private fun generateDataObject(channel: SocketChannel, socket: SocketInterface): Any? {
+    private fun generateDataObject(channel: SocketChannel, socket: OldSocketInterface): Any? {
         return when (channel.socket().localPort) {
             broker.port, broker.webSocketPort -> ClientConnection(socket, broker)
             broker.cluster?.tcpPort -> {

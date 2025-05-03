@@ -2,8 +2,11 @@ package io.github.davidepianca98
 
 import io.github.davidepianca98.socket.streams.ByteArrayOutputStream
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-public expect fun currentTimeMillis(): Long
+@OptIn(ExperimentalTime::class)
+public fun currentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 public fun generateRandomClientId(): String {
     val length = 30
