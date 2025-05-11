@@ -136,17 +136,20 @@ tasks {
 
 // Fix Gradle warning about signing tasks using publishing task outputs without explicit dependencies
 // https://github.com/gradle/gradle/issues/26091
-tasks.withType<AbstractPublishToMaven>().configureEach {
-    val signingTasks = tasks.withType<Sign>()
-    mustRunAfter(signingTasks)
-}
+//tasks.withType<AbstractPublishToMaven>().configureEach {
+//    val signingTasks = tasks.withType<Sign>()
+//    mustRunAfter(signingTasks)
+//}
 
 publishing {
+    val mavenRepo = "https://maven.pkg.github.com/Sieveo/KMQTT"
     repositories {
         maven {
-            name = "github"
-            url = uri("https://maven.pkg.github.com/davidepianca98/KMQTT")
-            credentials(PasswordCredentials::class)
+            url = uri(mavenRepo)
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }

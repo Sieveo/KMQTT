@@ -37,4 +37,4 @@ jobs:
       - name: Build with Gradle #This caches by default
         uses: gradle/actions/setup-gradle@v3
 
-      - run: ./gradlew clean :kmqtt-client:publish --no-daemon
+      - run: ./gradlew clean publish --no-daemon

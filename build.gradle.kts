@@ -18,6 +18,6 @@ plugins {
 }
 
 subprojects {
-    group = "io.github.davidepianca98"
-    version = "1.0.0"
+    group = "com.sieveo.kmqtt"
+    version = "2.0.0-SNAPSHOT"
 }

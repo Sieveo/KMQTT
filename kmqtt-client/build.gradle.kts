@@ -6,9 +6,6 @@ plugins {
     id("org.jetbrains.kotlinx.atomicfu")
 }
 
-group = "com.sieveo.kmqtt"
-version = "1.0.0-SNAPSHOT"
-
 kotlin {
     explicitApi()
     jvm {
