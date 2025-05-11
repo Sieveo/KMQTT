@@ -1,0 +1,40 @@
+name: Deploy to Github Packages
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CI_TAG: ${{ github.ref_name }}
+      PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
+      PACKAGES_READ: ${{ secrets.PACKAGES_READ }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v3
+      - uses: actions/cache@v4 #This is for caching the kotlin native toolchain
+        with:
+          path: |
+            ~/.konan
+          key: ${{ runner.os }}-${{ hashFiles('**/.lock') }}
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build with Gradle #This caches by default
+        uses: gradle/actions/setup-gradle@v3
+
+      - run: echo "TAG is ${CI_TAG}"
+      - run: sed -i .whatever-mac-being-weird "s/REPLACE_WITH_TAG/${CI_TAG}/g" kompliant/src/commonMain/kotlin/com/sieveo/digsig/kompliant/Consts.kt
+      - run: ./gradlew clean publish --no-daemon

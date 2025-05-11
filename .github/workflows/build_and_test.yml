@@ -1,0 +1,30 @@
+name: Build and test
+
+on:
+  push: #Any branch, ignore all tags.
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
+      PACKAGES_READ: ${{ secrets.PACKAGES_READ }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build with Gradle #This caches by default
+        uses: gradle/actions/setup-gradle@v3
+      - run: ./gradlew jvmTest --no-daemon
