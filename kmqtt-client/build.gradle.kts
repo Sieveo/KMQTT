@@ -1,11 +1,13 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     id("convention.publication")
     id("org.jetbrains.kotlinx.atomicfu")
 }
+
+group = "com.sieveo.kmqtt"
+version = "1.0.0-SNAPSHOT"
 
 kotlin {
     explicitApi()
@@ -144,17 +146,20 @@ kotlin {
 
 // Fix Gradle warning about signing tasks using publishing task outputs without explicit dependencies
 // https://github.com/gradle/gradle/issues/26091
-tasks.withType<AbstractPublishToMaven>().configureEach {
-    val signingTasks = tasks.withType<Sign>()
-    mustRunAfter(signingTasks)
-}
+//tasks.withType<AbstractPublishToMaven>().configureEach {
+//    val signingTasks = tasks.withType<Sign>()
+//    mustRunAfter(signingTasks)
+//}
 
 publishing {
+    val mavenRepo = "https://maven.pkg.github.com/Sieveo/KMQTT"
     repositories {
         maven {
-            name = "github"
-            url = uri("https://maven.pkg.github.com/davidepianca98/KMQTT")
-            credentials(PasswordCredentials::class)
+            url = uri(mavenRepo)
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }
