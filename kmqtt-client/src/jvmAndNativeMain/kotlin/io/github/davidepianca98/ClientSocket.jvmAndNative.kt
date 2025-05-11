@@ -4,30 +4,14 @@ import io.github.davidepianca98.socket.ConnectionDetails
 import io.github.davidepianca98.socket.SocketClosedException
 import io.github.davidepianca98.socket.SocketInterface
 import io.github.davidepianca98.socket.SocketProtocolType
-import io.ktor.client.*
-import io.ktor.client.plugins.websocket.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.ByteWriteChannel
-import io.ktor.utils.io.availableForRead
-import io.ktor.utils.io.cancel
-import io.ktor.utils.io.close
-import io.ktor.utils.io.core.readBytes
-import io.ktor.utils.io.read
-import io.ktor.utils.io.readByteArray
-import io.ktor.utils.io.readPacket
-import io.ktor.utils.io.readUntil
-import io.ktor.utils.io.write
-import io.ktor.utils.io.writeByteArray
-import io.ktor.websocket.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
-import kotlinx.io.readByteArray
 
 public actual fun createClientSocket(connectionDetails: ConnectionDetails): SocketInterface {
     return TcpSocket(connectionDetails)
