@@ -9,6 +9,9 @@ import io.github.davidepianca98.mqtt.broker.Broker
 import io.github.davidepianca98.mqtt.packets.Qos
 import io.github.davidepianca98.mqtt.packets.mqttv5.ReasonCode
 import io.github.davidepianca98.mqtt.packets.mqttv5.SubscriptionOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -32,7 +35,9 @@ class PublishSubscribeMultipleClientsTest {
             null,
             clientId = "client2",
             onSubscribed = {
-                clientPub.publish(false, qos, topic, payload)
+                CoroutineScope(Dispatchers.Default).launch {
+                    clientPub.publish(false, qos, topic, payload)
+                }
             }
         ) {
             assertEquals(topic, it.topicName)

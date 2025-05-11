@@ -1,12 +1,6 @@
 package io.github.davidepianca98
 
-import io.github.davidepianca98.socket.tcp.Socket
+import io.github.davidepianca98.socket.ConnectionDetails
+import io.github.davidepianca98.socket.SocketInterface
 
-public expect class ClientSocket(
-    address: String,
-    port: Int,
-    maximumPacketSize: Int,
-    readTimeOut: Int,
-    connectTimeOut: Int,
-    checkCallback: () -> Unit
-) : Socket
+public expect fun createClientSocket(connectionDetails: ConnectionDetails): SocketInterface

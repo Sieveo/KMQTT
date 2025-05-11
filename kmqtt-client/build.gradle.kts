@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     id("convention.publication")
@@ -12,6 +15,7 @@ kotlin {
         }
     }
     js {
+        browser()
         nodejs {
             binaries.executable()
         }
@@ -32,6 +36,11 @@ kotlin {
     watchosSimulatorArm64 {}
     watchosX64 {}
 
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         all {
             languageSettings.apply {
@@ -42,83 +51,93 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-common"))
-                implementation(project(":kmqtt-common"))
+                api(project(":kmqtt-common"))
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.websockets)
+                implementation(libs.ktor.client.cio)
             }
         }
+
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
             }
         }
-        val jvmMain by getting {}
+
+        val jvmAndNativeMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(libs.ktor.network)
+                implementation(libs.ktor.network.tls)
+            }
+        }
+
+        val jvmMain by getting {
+            dependsOn(jvmAndNativeMain)
+            dependencies {
+                implementation("ch.qos.logback:logback-classic:1.5.18")
+            }
+        }
+
         val jvmTest by getting {
             dependencies {
-                implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
             }
         }
-        val jsMain by getting {
-            dependencies {
-                implementation(libs.kotlin.node)
-            }
-        }
-        val jsTest by getting {
-            dependencies {
-                implementation(kotlin("test-js"))
-            }
-        }
-        val posixMain by creating {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(libs.atomicfu)
-            }
-        }
+
         val mingwX64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val linuxX64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val linuxArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val iosX64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val iosArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val iosSimulatorArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val macosX64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val macosArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val tvosX64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val tvosArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val tvosSimulatorArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val watchosX64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val watchosArm32Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val watchosArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
         }
         val watchosSimulatorArm64Main by getting {
-            dependsOn(posixMain)
+            dependsOn(jvmAndNativeMain)
+        }
+
+        val wasmJsMain by getting {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.wasmjs)
+                implementation(libs.ktor.client.js)
+            }
         }
     }
 }
