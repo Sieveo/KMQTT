@@ -37,7 +37,9 @@ kotlin {
     watchosX64 {}
 
     @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {}
+    wasmJs {
+        browser()
+    }
 
     sourceSets {
         all {
@@ -53,35 +55,82 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.websockets)
+                implementation(libs.ktor.client.cio)
             }
         }
+
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
             }
         }
-        val jvmMain by getting {
+
+        val jvmAndNativeMain by creating {
+            dependsOn(commonMain)
             dependencies {
-                implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.network)
+                implementation(libs.ktor.network.tls)
+            }
+        }
+
+        val jvmMain by getting {
+            dependsOn(jvmAndNativeMain)
+            dependencies {
                 implementation("ch.qos.logback:logback-classic:1.5.18")
             }
         }
+
         val jvmTest by getting {
             dependencies {
-                implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
             }
         }
-        val jsMain by getting {
-            dependencies {
-                implementation(libs.kotlin.node)
-            }
+
+        val mingwX64Main by getting {
+            dependsOn(jvmAndNativeMain)
         }
-        val jsTest by getting {
-            dependencies {
-                implementation(kotlin("test-js"))
-            }
+        val linuxX64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val linuxArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val iosX64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val iosArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val iosSimulatorArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val macosX64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val macosArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val tvosX64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val tvosArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val tvosSimulatorArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val watchosX64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val watchosArm32Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val watchosArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
+        }
+        val watchosSimulatorArm64Main by getting {
+            dependsOn(jvmAndNativeMain)
         }
 
         val wasmJsMain by getting {

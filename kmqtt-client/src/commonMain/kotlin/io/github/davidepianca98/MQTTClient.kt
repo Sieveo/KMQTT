@@ -52,6 +52,7 @@ import io.github.davidepianca98.socket.ConnectionDetails
 import io.github.davidepianca98.socket.IOException
 import io.github.davidepianca98.socket.SocketClosedException
 import io.github.davidepianca98.socket.SocketInterface
+import io.github.davidepianca98.socket.SocketProtocolType
 import io.github.davidepianca98.socket.streams.EOFException
 import io.github.davidepianca98.socket.tls.TLSClientSettings
 import kotlinx.atomicfu.AtomicBoolean
@@ -96,7 +97,7 @@ import kotlin.time.Duration.Companion.seconds
 public class MQTTClient(
     private val mqttVersion: MQTTVersion = MQTTVersion.MQTT5,
     private val connectionDetails: ConnectionDetails,
-    private val tls: TLSClientSettings? = null,
+    private val tls: TLSClientSettings? = null, //TODO: Pass this through, perhaps refactor...
     keepAlive: Int = 60,
     private val cleanStart: Boolean = true,
     private var clientId: String? = null,
@@ -120,15 +121,80 @@ public class MQTTClient(
     private val publishReceived: (publish: MQTTPublish) -> Unit
 ) {
 
+    public constructor(
+        mqttVersion: MQTTVersion,
+        address: String,
+        port: Int,
+        tls: TLSClientSettings?,
+        keepAlive: Int = 60,
+        webSocket: String? = null,
+        cleanStart: Boolean = true,
+        clientId: String? = null,
+        userName: String? = null,
+        password: UByteArray? = null,
+        properties: MQTT5Properties = MQTT5Properties(),
+        willProperties: MQTT5Properties? = null,
+        willTopic: String? = null,
+        willPayload: UByteArray? = null,
+        willRetain: Boolean = false,
+        willQos: Qos = Qos.AT_MOST_ONCE,
+        connackTimeout: Int = 30,
+        connectTimeout: Int = 30,
+        autoInit: Boolean = true,
+        enhancedAuthCallback: (authenticationData: UByteArray?) -> UByteArray? = { null },
+        onConnected: (connack: MQTTConnack) -> Unit = {},
+        onDisconnected: (disconnect: MQTTDisconnect?) -> Unit = {},
+        onSubscribed: (suback: MQTTSuback) -> Unit = {},
+        onUnsubscribed: (unsuback: MQTTUnsuback) -> Unit = {},
+        debugLog: Boolean = false,
+        publishReceived: (publish: MQTTPublish) -> Unit
+    ) : this(
+        mqttVersion,
+        ConnectionDetails(
+            address, port, when {
+                webSocket != null && tls != null -> SocketProtocolType.SECURE_WEB_SOCKET
+                webSocket != null && tls == null -> SocketProtocolType.WEB_SOCKET
+                tls != null -> SocketProtocolType.TLS_SOCKET
+                else -> SocketProtocolType.TCP_SOCKET
+            }
+        ),
+        tls,
+        keepAlive,
+        cleanStart,
+        clientId,
+        userName,
+        password,
+        properties,
+        willProperties,
+        willTopic,
+        willPayload,
+        willRetain,
+        willQos,
+        connackTimeout,
+        connectTimeout,
+        autoInit,
+        enhancedAuthCallback,
+        onConnected,
+        onDisconnected,
+        onSubscribed,
+        onUnsubscribed,
+        debugLog,
+        publishReceived
+    )
+
+
     private val initialized: AtomicBoolean = atomic(false)
 
     private val maximumPacketSize = properties.maximumPacketSize?.toInt() ?: (1024 * 1024)
+
     private var socket: SocketInterface? = null
+
     private val running: AtomicBoolean = atomic(false)
 
     private val keepAlive = atomic(keepAlive)
 
     private val currentReceivedPacket = MQTTCurrentPacket(maximumPacketSize.toUInt(), mqttVersion)
+
     private val lastActiveTimestamp = atomic(currentTimeMillis())
 
     // Session
@@ -136,39 +202,67 @@ public class MQTTClient(
 
     // QoS 1 and QoS 2 messages which have been sent to the Server, but have not been completely acknowledged
     private val pendingAcknowledgeMessages = mutableMapOf<UInt, MQTTPublish>()
+
     private val pendingAcknowledgePubrel = mutableMapOf<UInt, MQTTPubrel>()
 
     // QoS 2 messages which have been received from the Server, but have not been completely acknowledged
     private val qos2ListReceived = mutableListOf<UInt>()
 
     // List of messages to be sent after CONNACK has been received
-    private val pendingSendMessages = atomic(mutableListOf<UByteArray>())
+    private val pendingSendMessages = atomic(
+        mutableListOf<UByteArray>()
+    )
 
     private val lock = ReentrantLock()
 
     // Connection
     private val topicAliasesClient = mutableMapOf<UInt, String>() // TODO reset all these on reconnection
-    private val maximumQos = atomic(Qos.EXACTLY_ONCE)
-    private val retainedSupported = atomic(true)
-    private val maximumServerPacketSize = atomic(128 * 1024 * 1024)
+
+    private val maximumQos = atomic(
+        Qos.EXACTLY_ONCE
+    )
+
+    private val retainedSupported = atomic(
+        true
+    )
+
+    private val maximumServerPacketSize = atomic(
+        128 * 1024 * 1024
+    )
+
     private var topicAliasMaximum = 0u
+
     private var wildcardSubscriptionAvailable = true
+
     private var subscriptionIdentifiersAvailable = true
+
     private var sharedSubscriptionAvailable = true
-    private val receiveMax = atomic(65535u)
-    private val connackReceived: AtomicBoolean = atomic(false)
+
+    private val receiveMax = atomic(
+        65535u
+    )
+
+    private val connackReceived: AtomicBoolean = atomic(
+        false
+    )
 
     init {
         if (keepAlive > 65535) {
-            throw IllegalArgumentException("Keep alive exceeding the maximum value")
+            throw IllegalArgumentException(
+                "Keep alive exceeding the maximum value"
+            )
         }
 
         if (willTopic == null && (willQos != Qos.AT_MOST_ONCE || willPayload != null || willRetain)) {
-            throw IllegalArgumentException("Will topic null, but other will options have been set")
+            throw IllegalArgumentException(
+                "Will topic null, but other will options have been set"
+            )
         }
 
         if (userName == null && password != null) {
-            throw IllegalArgumentException("Cannot set password without username")
+            throw IllegalArgumentException(
+                "Cannot set password without username"
+            )
         }
     }
 
@@ -183,23 +277,14 @@ public class MQTTClient(
 
     private suspend fun connectSocket(readTimeout: Int, connectTimeout: Int) {
         connackReceived.getAndSet(false)
-        socket = WebSocket(connectionDetails)
+
+        socket = when (connectionDetails.protocol) {
+            SocketProtocolType.TCP_SOCKET, SocketProtocolType.TLS_SOCKET -> createClientSocket(connectionDetails)
+            SocketProtocolType.WEB_SOCKET, SocketProtocolType.SECURE_WEB_SOCKET -> WebSocket(connectionDetails)
+        }
+
         socket?.connect()
         sendConnect()
-
-//        TODO: add other transports back
-//        if (socket == null) {
-//            connackReceived.getAndSet(false)
-//            socket = if (tls == null)
-//                ClientSocket(address, port, maximumPacketSize, readTimeout, connectTimeout, ::check)
-//            else
-//                TLSClientSocket(address, port, maximumPacketSize, readTimeout, connectTimeout, tls, ::check)
-//            if (webSocket != null) {
-//                socket = WebSocket(socket!!, address, webSocket)
-//            }
-//
-//            sendConnect()
-//        }
     }
 
     public fun isInitialized(): Boolean = initialized.value
