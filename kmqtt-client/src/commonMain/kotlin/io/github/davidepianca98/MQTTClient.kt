@@ -55,6 +55,7 @@ import io.github.davidepianca98.socket.SocketInterface
 import io.github.davidepianca98.socket.SocketProtocolType
 import io.github.davidepianca98.socket.streams.EOFException
 import io.github.davidepianca98.socket.tls.TLSClientSettings
+import io.ktor.utils.io.*
 import kotlinx.atomicfu.AtomicBoolean
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.ReentrantLock
@@ -295,11 +296,24 @@ public class MQTTClient(
 
     private suspend fun send(data: UByteArray, force: Boolean = false) {
         if (connackReceived.value || force) {
-            socket?.send(data) ?: throw SocketClosedException("MQTT send failed")
-            if (debugLog) {
-                println("Sent: " + data.toHexString())
+            try {
+                socket?.send(data) ?: throw SocketClosedException("MQTT send failed")
+                if (debugLog) {
+                    println("Sent: " + data.toHexString())
+                }
+                lastActiveTimestamp.getAndSet(currentTimeMillis())
+            } catch (e: Exception) {
+                when (e) {
+                    is IOException,
+                    is ClosedWriteChannelException -> {
+                        socket = null
+                        running.getAndSet(false)
+                        throw e
+                    }
+
+                    else -> throw e
+                }
             }
-            lastActiveTimestamp.getAndSet(currentTimeMillis())
         } else {
             pendingSendMessages.value += data
         }

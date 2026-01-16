@@ -19,5 +19,5 @@ plugins {
 
 subprojects {
     group = "com.sieveo.kmqtt"
-    version = "2.0.0-SNAPSHOT"
+    version = "2.0.1-SNAPSHOT"
 }
